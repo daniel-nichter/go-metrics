@@ -1,4 +1,34 @@
-// Package metrics provides universal base metrics: counter, gauge, and histogram.
+// Package metrics provides base metric types: counter, gauge, and histogram.
+// This package is intended to implement low-level metrics in applications with
+// short metric reporting intervals (1-60 seconds). The canonical use case is
+// an API that reports metrics every 1-30s, resets the gauges and histograms,
+// and emits the metrics to a 3rd-party metrics system like Datadog, SignalFx, Prometheus, etc.
+// Use another package for longer intervals, streaming metrics, or trending.
+//
+// This package differs from other Go metric packages in three significant ways:
+//
+// 1. Metrics: Only base metric types are provide (counter, gauge, histogram).
+// There are no sinks, registries, or derivative metric types. These should be
+// implement by other packages which import this package.
+//
+// 2. Sampling: Only "Algorithm R" by Jeffrey Vitter (https://www.cs.umd.edu/~samir/498/vitter.pdf)
+// is used to sample values for Gauge and Histogram. The reservoir size is fixed
+// at 2,000. Testing with real-world values shows that smaller and larger sizes
+// either yield no benefit or reduce accuracy. And the true maximum value is kept
+// and reported, which is not a feature of the original Algorithm R but critical
+// for application performance monitoring.
+//
+// 3. Percentiles: Both nearest rank and linear interpolation are used calculate
+// percentile values. If the sample is full (>= 2,000 values), nearest rank is
+// used; else, "Definition 8"--better known as "R8"--is used (https://www.amherst.edu/media/view/129116/original/Sample+Quantiles.pdf).
+// Testing with real-world values shows that this combination produces more accurate
+// P999 (99.9th percentile) values, which is the gold standard for high-performance,
+// low-latency applications.
+//
+// Additionally, this package supports atomic snapshots: metric values can be
+// reset to zero after snapshot with no loss of values between snapshot and reset.
+//
+// Counter, Gauge, and Histogram are safe for use by multiple goroutines.
 package metrics
 
 import (
@@ -14,25 +44,47 @@ var defaultSampleSize = 2000
 // Config represents Gauge and Histogram configuration. Currently, only percentiles
 // are configured. This struct is placeholder for future configurations, if needed.
 type Config struct {
-	// Percentiles to calculate for each Snapshot. Values must be divided by 100,
-	// so the 99th percentile is 0.99. If the list is nil or empty, no percentiles
-	// are calculated.
+	// Percentiles to calculate for Gauge and Histogram snapshots. Values must
+	// be divided by 100, so the 99th percentile is 0.99. If the list is nil or
+	// empty, no percentiles are calculated.
 	Percentiles []float64
 }
 
-// A Metric generates a Snapshot of its current values.
+// A Metric generates a Snapshot of its current values. If reset is true, all
+// values are reset to zero.
 type Metric interface {
 	Snapshot(reset bool) Snapshot
 }
 
-// Snapshot represents a Metric at one point in time.
+// Snapshot represents Metric values at one point in time.
 type Snapshot struct {
-	N          int64               // c, g, h
-	Sum        float64             // c, g, h
-	Min        float64             // _, g, h
-	Max        float64             // _, g, h
-	Percentile map[float64]float64 // _, g, h
-	Last       float64             // _, g, _
+	// N is the number of values. For Counter, this is generally not used.
+	// For Gauge and Histogram, this is used to calculate the true average:
+	// Sum / N.
+	N int64
+
+	// Sum is the sum of all values. For Counter, this is the value returned by
+	// Count(). For Gauge and Histogram, this is used to calculate the true
+	// average: Sum / N.
+	Sum float64
+
+	// Min is the minimum sample value. It might not be the true minimum value.
+	// For Counter, this is always zero. For Gauge and Histogram, it is the
+	// minimum value in the sample.
+	Min float64
+
+	// Max is the true maximum value. For Counter, this is always zero.
+	// For Gauge and Histogram, it is the true maximum value which might not
+	// be present in the sample but was recorded.
+	Max float64
+
+	// Percentile is the percentile value for each Config.Percentiles.
+	// For Counter, the map is always nil.
+	Percentile map[float64]float64
+
+	// Last is the last value recorded (or added) to a Gauge. This is the value
+	// returned by Last(). For Counter and Histogram, it is always zero.
+	Last float64
 }
 
 // --------------------------------------------------------------------------
