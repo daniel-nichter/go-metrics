@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"sort"
 	"sync"
+	"sync/atomic"
 )
 
 var defaultSampleSize = 2000
@@ -52,17 +53,12 @@ func NewCounter() *Counter {
 }
 
 func (c *Counter) Add(delta int64) {
-	c.Lock()
-	c.n += 1
-	c.sum += delta
-	c.Unlock()
+	atomic.AddInt64(&c.n, 1)
+	atomic.AddInt64(&c.sum, delta)
 }
 
 func (c *Counter) Count() int64 {
-	c.Lock()
-	cnt := c.sum
-	c.Unlock()
-	return cnt
+	return atomic.LoadInt64(&c.sum)
 }
 
 func (c *Counter) Snapshot(reset bool) Snapshot {
