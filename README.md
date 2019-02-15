@@ -8,7 +8,7 @@ This package differs from other Go metric packages in three significant ways:
 
 1. Metrics: Only base metric types are provide (counter, gauge, histogram). There are no sinks, registries, or derivative metric types. These should be implement by other packages which import this package.
 
-2. Sampling: Only ["Algorithm R" by Jeffrey Vitter](https://www.cs.umd.edu/~samir/498/vitter.pdf) is used to sample values for Gauge and Histogram. The reservoir size is fixed at 2,000. Testing with real-world values shows that smaller and larger sizes either yield no benefit or reduce accuracy. And the true maximum value is kept and reported, which is not a feature of the original Algorithm R but critical for application performance monitoring.
+2. Sampling: Only ["Algorithm R" by Jeffrey Vitter](https://www.cs.umd.edu/~samir/498/vitter.pdf) is used to sample values for Gauge and Histogram. The reservoir size is fixed at 2,000. Testing with real-world values shows that smaller and larger sizes yield no benefit. **And the true maximum value is kept and reported**, which is not a feature of the original Algorithm R but critical for application performance monitoring.
 
 3. Percentiles: Both nearest rank and linear interpolation are used calculate percentile values. If the sample is full (>= 2,000 values), nearest rank is used; else, "Definition 8"--better known as "R8"--is used ([Hyndman and Fan (1996)](https://www.amherst.edu/media/view/129116/original/Sample+Quantiles.pdf)). Testing with real-world values shows that this combination produces more accurate P999 (99.9th percentile) values, which is the gold standard for high-performance, low-latency applications.
 
