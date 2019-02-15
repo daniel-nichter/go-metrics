@@ -617,6 +617,7 @@ func valuesFromFile(file string, t *testing.T) []float64 {
 }
 
 func TestDataFile_4ktrend1to7(t *testing.T) {
+	// Greater than 2k values so nearest rank is used
 	h1 := metrics.NewHistogram(p999Config)
 	for _, v := range valuesFromFile("test/4k-trend-1-to-7", t) {
 		h1.Record(v)
@@ -629,6 +630,48 @@ func TestDataFile_4ktrend1to7(t *testing.T) {
 		Max: 6.989429,
 		Percentile: map[float64]float64{
 			0.999: 6.9546, // real: 6.967
+		},
+	}
+	if diff := deep.Equal(gotSnap, expectSnap); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestDataFile_1k(t *testing.T) {
+	// Less than 2k values so R8 kicks in
+	h1 := metrics.NewHistogram(p999Config)
+	for _, v := range valuesFromFile("test/1k", t) {
+		h1.Record(v)
+	}
+	gotSnap := h1.Snapshot(true) // reset
+	expectSnap := metrics.Snapshot{
+		N:   1000,
+		Sum: 1.53073,
+		Min: 0.000011,
+		Max: 1.089862,
+		Percentile: map[float64]float64{
+			0.999: 0.78721666,
+		},
+	}
+	if diff := deep.Equal(gotSnap, expectSnap); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestDataFile_300(t *testing.T) {
+	// At only 300 values, P999 = max
+	h1 := metrics.NewHistogram(p999Config)
+	for _, v := range valuesFromFile("test/300", t) {
+		h1.Record(v)
+	}
+	gotSnap := h1.Snapshot(true) // reset
+	expectSnap := metrics.Snapshot{
+		N:   300,
+		Sum: 0.260362,
+		Min: 0.000011,
+		Max: 0.182833,
+		Percentile: map[float64]float64{
+			0.999: 0.182833,
 		},
 	}
 	if diff := deep.Equal(gotSnap, expectSnap); diff != nil {

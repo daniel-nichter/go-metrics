@@ -301,18 +301,18 @@ func percentiles(percentiles, values []float64, sampleSize int) map[float64]floa
 		return scores
 	}
 	for _, p := range percentiles {
-		//pos := p * (float64(n) + 1) // R6
-		//pos := p*(float64(n)-1) + 1 // R7
-		pos := p*(n+(1/3.0)) + (1 / 3.0) // R8
-		if pos < 1.0 {
+		//i := p * (float64(n) + 1) // R6
+		//i := p*(float64(n)-1) + 1 // R7
+		i := p*(n+(1/3.0)) + (1 / 3.0) // R8
+		if i < 1.0 {
 			scores[p] = values[0]
-		} else if pos >= n {
+		} else if i >= n {
 			scores[p] = values[int(n)-1]
 		} else {
-			i, d := math.Modf(pos) // 8.53 -> i=8, d=53
-			lower := values[int(i)-1]
-			upper := values[int(i)]
-			scores[p] = lower + d*(upper-lower)
+			k, f := math.Modf(i) // 8.53 -> i=8, d=53
+			lower := values[int(k)-1]
+			upper := values[int(k)]
+			scores[p] = lower + f*(upper-lower)
 		}
 	}
 	return scores
